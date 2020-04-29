@@ -1,76 +1,27 @@
 use teloxide::prelude::*;
-use std::fs::File;
-use std::path::PathBuf;
-use std::fs;
-use std::io::Write;
-use bytes::Bytes;
-use std::process::{Command, Stdio};
+// TODO error handling with ParseError
+use url::Url;
 
-pub struct Video {
-    pub filename: String,
-    body: Bytes,
-}
+// TODO remove all panics!
+pub fn handle_message(message: &str) -> String {
+    let parsed_link = Url::parse(message).expect("Parsing Error!");
 
-impl Video {
-    pub async fn new(link: &str) -> Video {
-        let response = Self::download_resource(link).await;
-        let filename = Self::get_filename(&response);
-        let body = Self::get_body(response).await;
+    dbg!(&parsed_link.as_str());
 
-        Video {
-            filename,
-            body,
-        }
-    }
+    let mut path_segments = parsed_link.path_segments()
+        .ok_or_else(|| "cannot be base")
+        .expect("Error while find filename")
+        .skip(1); // Skip "photo"
+    let filename = path_segments.next().expect("Error while getting filename");
 
-    pub fn save_to_fs(&self, folder: &str) {
-        fs::create_dir(&folder);
-        let full_filename = get_full_filename(folder, &self.filename);
-        write_to_file(&full_filename, &self.body);
-    }
+    // Remove vp9 and av1 from filename if contains
+    let result_filename = filename.replace("vp9", "");
+    let result_filename = result_filename.replace("av1", "");
 
-    async fn get_body(response: reqwest::Response) -> Bytes {
-        let body = response.bytes().await.expect("Problem while getting response body");
-        body
-    }
-
-    fn get_filename(response: &reqwest::Response) -> String {
-        response
-            .url()
-            .path_segments()
-            .and_then(|segments| segments.last())
-            .and_then(|name| if name.is_empty() { None } else { Some(name) })
-            .unwrap_or("tmp.bin")
-            .to_owned()
-    }
-
-    async fn download_resource(link: &str) -> reqwest::Response {
-        let client = reqwest::Client::new();
-        client.get(link).send().await.expect("Problem while GET request")
-    }
-}
-
-// TODO fix case when folder does not have slash
-pub fn get_full_filename(folder: &str, filename: &str) -> String {
-        let mut full_filename = String::from(folder);
-        full_filename.push_str(&filename);
-        full_filename
-}
-
-fn write_to_file(filename: &str, body: &[u8])
-{
-    let mut destination = File::create(filename).expect("Problem while create file");
-    destination.write_all(body);
-}
-
-pub fn to_mp4(dir: &str, filename: &str, result_filename: &str) {
-    Command::new("ffmpeg")
-        .stdout(Stdio::null())
-        .arg("-i")
-        .arg(&get_full_filename(dir, filename))
-        .arg(&get_full_filename(dir, result_filename))
-        .output()
-        .expect("Failed to execute process");
+    dbg!(&result_filename);
+    let result_link = parsed_link.join(&result_filename).expect("Error while join");
+    dbg!(&result_link.as_str());
+    result_link.into_string()
 }
 
 pub async fn run() {
@@ -84,23 +35,9 @@ teloxide::enable_logging!();
             rx.for_each(|message| async move {
                 let link = &message.update.text().expect("Faild while read link");
                 dbg!(&link);
+                let respond = handle_message(link);
+                message.answer(&respond).send().await.log_on_error().await;
 
-                //let temp_dir = "tmp/";
-                //let result_filename = "result.mp4";
-                //let video = Video::new(link).await;
-                //video.save_to_fs(temp_dir);
-                //to_mp4(&temp_dir, &video.filename, result_filename);
-
-                //let path_to_result = PathBuf::from(get_full_filename(&temp_dir, result_filename));
-                //dbg!(&path_to_result);
-                //message
-                //    .answer_video(teloxide::types::InputFile::File(path_to_result))
-                //    .send()
-                //    .await
-                //    .log_on_error()
-                //    .await;
-
-                //fs::remove_dir_all(temp_dir);
             })
         })
         .dispatch()
