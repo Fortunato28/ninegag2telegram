@@ -1,7 +1,7 @@
-use webm2mp4_bot as w2m;
+use ninegag2telegram as n2t;
 
 #[tokio::main]
 async fn main() {
 
-    w2m::run().await;
+    n2t::run().await;
 }

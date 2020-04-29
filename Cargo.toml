@@ -1,5 +1,5 @@
 [package]
-name = "webm2mp4_bot"
+name = "ninegag2telegram"
 version = "0.1.0"
 authors = ["Anton Sapunov <fort.sav.28@gmail.com>"]
 edition = "2018"
