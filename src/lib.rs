@@ -1,13 +1,68 @@
 use teloxide::prelude::*;
+use std::fs;
+use std::path::PathBuf;
+use std::fs::File;
+use bytes::Bytes;
 // TODO error handling with ParseError
 use url::Url;
 use std::error;
+use std::io::Write;
 
-// TODO remove all panics!
+// new have to create video on the filesystem, drop should remove it
+pub struct Video {
+    pub filename: String,
+    body: Bytes,
+}
+
+impl Video {
+    pub async fn new(link: &str) -> Video {
+        let response = Self::download_resource(link).await;
+        let filename = Self::get_filename(&response);
+        let body = Self::get_body(response).await;
+        Self::save_to_fs(&filename, &body);
+
+        Video {
+            filename,
+            body,
+        }
+    }
+
+    fn save_to_fs(filename: &str, body: &[u8]) {
+        let mut destination = File::create(filename).expect("Problem while create file");
+        destination.write_all(body);
+    }
+
+    async fn get_body(response: reqwest::Response) -> Bytes {
+        let body = response.bytes().await.expect("Problem while getting response body");
+        body
+    }
+
+    fn get_filename(response: &reqwest::Response) -> String {
+        response
+            .url()
+            .path_segments()
+            .and_then(|segments| segments.last())
+            .and_then(|name| if name.is_empty() { None } else { Some(name) })
+            .unwrap_or("tmp.bin")
+            .to_owned()
+    }
+
+    async fn download_resource(link: &str) -> reqwest::Response {
+        let client = reqwest::Client::new();
+        client.get(link).send().await.expect("Problem while GET request")
+    }
+}
+
+impl Drop for Video {
+    fn drop(&mut self) {
+        dbg!(&self.filename);
+        fs::remove_file(&self.filename);
+    }
+}
+
+// TODO not pub!
 pub fn handle_message(message: &str) -> Result<String, Box<dyn error::Error>> {
     let parsed_link = Url::parse(message)?;
-
-    dbg!(&parsed_link.as_str());
 
     let mut path_segments = parsed_link.path_segments()
         .ok_or_else(|| "cannot be base")
@@ -19,9 +74,7 @@ pub fn handle_message(message: &str) -> Result<String, Box<dyn error::Error>> {
     let result_filename = filename.replace("vp9", "");
     let result_filename = result_filename.replace("av1", "");
 
-    dbg!(&result_filename);
     let result_link = parsed_link.join(&result_filename)?;
-    dbg!(&result_link.as_str());
     Ok(result_link.into_string())
 }
 
@@ -39,7 +92,15 @@ teloxide::enable_logging!();
 
                 let respond = handle_message(link)
                     .unwrap_or("Sorry, I can`t handle this message".to_owned());
-                message.answer(&respond).send().await.log_on_error().await;
+                let video = Video::new(&respond).await;
+
+                let path_to_result = PathBuf::from(&video.filename);
+                message
+                    .answer_video(teloxide::types::InputFile::File(path_to_result))
+                    .send()
+                    .await
+                    .log_on_error()
+                    .await;
 
             })
         })
