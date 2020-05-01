@@ -1,14 +1,13 @@
 use bytes::Bytes;
+use std::error;
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use teloxide::prelude::*;
-// TODO error handling with ParseError
-use std::error;
-use std::io::Write;
 use url::Url;
 
-// new have to create video on the filesystem, drop should remove it
+// TODO error handling with ParseError
 pub struct Video {
     pub filename: String,
     body: Bytes,
@@ -92,7 +91,7 @@ pub async fn run() {
 
     Dispatcher::new(bot)
         .messages_handler(|rx: DispatcherHandlerRx<Message>| {
-            rx.for_each(|message| async move {
+            rx.for_each_concurrent(None, |message| async move {
                 let link = &message.update.text().unwrap_or("This is not a text dude");
 
                 let respond =
