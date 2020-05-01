@@ -1,12 +1,12 @@
-use teloxide::prelude::*;
-use std::fs;
-use std::path::PathBuf;
-use std::fs::File;
 use bytes::Bytes;
+use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
+use teloxide::prelude::*;
 // TODO error handling with ParseError
-use url::Url;
 use std::error;
 use std::io::Write;
+use url::Url;
 
 // new have to create video on the filesystem, drop should remove it
 pub struct Video {
@@ -21,10 +21,7 @@ impl Video {
         let body = Self::get_body(response).await;
         Self::save_to_fs(&filename, &body);
 
-        Video {
-            filename,
-            body,
-        }
+        Video { filename, body }
     }
 
     fn save_to_fs(filename: &str, body: &[u8]) {
@@ -33,7 +30,10 @@ impl Video {
     }
 
     async fn get_body(response: reqwest::Response) -> Bytes {
-        let body = response.bytes().await.expect("Problem while getting response body");
+        let body = response
+            .bytes()
+            .await
+            .expect("Problem while getting response body");
         body
     }
 
@@ -49,7 +49,11 @@ impl Video {
 
     async fn download_resource(link: &str) -> reqwest::Response {
         let client = reqwest::Client::new();
-        client.get(link).send().await.expect("Problem while GET request")
+        client
+            .get(link)
+            .send()
+            .await
+            .expect("Problem while GET request")
     }
 }
 
@@ -64,11 +68,13 @@ impl Drop for Video {
 pub fn handle_message(message: &str) -> Result<String, Box<dyn error::Error>> {
     let parsed_link = Url::parse(message)?;
 
-    let mut path_segments = parsed_link.path_segments()
-        .ok_or_else(|| "cannot be base")
-        ?
+    let mut path_segments = parsed_link
+        .path_segments()
+        .ok_or_else(|| "cannot be base")?
         .skip(1); // Skip "photo"
-    let filename = path_segments.next().ok_or_else(|| "Error while getting filename")?;
+    let filename = path_segments
+        .next()
+        .ok_or_else(|| "Error while getting filename")?;
 
     // Remove vp9 and av1 from filename if contains
     let result_filename = filename.replace("vp9", "");
@@ -79,7 +85,7 @@ pub fn handle_message(message: &str) -> Result<String, Box<dyn error::Error>> {
 }
 
 pub async fn run() {
-teloxide::enable_logging!();
+    teloxide::enable_logging!();
     log::info!("Starting ping_pong_bot!");
 
     let bot = Bot::from_env();
@@ -87,11 +93,10 @@ teloxide::enable_logging!();
     Dispatcher::new(bot)
         .messages_handler(|rx: DispatcherHandlerRx<Message>| {
             rx.for_each(|message| async move {
-                let link = &message.update.text()
-                    .unwrap_or("This is not a text dude");
+                let link = &message.update.text().unwrap_or("This is not a text dude");
 
-                let respond = handle_message(link)
-                    .unwrap_or("Sorry, I can`t handle this message".to_owned());
+                let respond =
+                    handle_message(link).unwrap_or("Sorry, I can`t handle this message".to_owned());
                 let video = Video::new(&respond).await;
 
                 let path_to_result = PathBuf::from(&video.filename);
@@ -101,7 +106,6 @@ teloxide::enable_logging!();
                     .await
                     .log_on_error()
                     .await;
-
             })
         })
         .dispatch()
