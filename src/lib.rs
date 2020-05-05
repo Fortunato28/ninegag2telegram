@@ -64,7 +64,9 @@ impl Drop for Video {
 }
 
 // TODO not pub!
-pub fn handle_message(message: &str) -> Result<String, Box<dyn error::Error>> {
+pub fn handle_message(
+    message: &str,
+) -> Result<String, Box<dyn error::Error + Send + Sync + 'static>> {
     let parsed_link = Url::parse(message)?;
 
     let mut path_segments = parsed_link
@@ -93,23 +95,26 @@ pub async fn run() {
         .messages_handler(|rx: DispatcherHandlerRx<Message>| {
             rx.for_each_concurrent(None, |message| async move {
                 match &message.update.text() {
-                    Some(link) => match handle_message(link) {
-                        Ok(respond) => {
-                            let video = Video::new(&respond).await;
+                    Some(link) => {
+                        match &handle_message(link) {
+                            Ok(respond) => {
+                                let video = Video::new(&respond).await;
 
-                            let path_to_result = PathBuf::from(&video.filename);
-                            message
-                                .answer_video(teloxide::types::InputFile::File(path_to_result))
-                                .send()
-                                .await
-                                .log_on_error()
-                                .await;
-                            println!("succesfully");
-                            println!("more");
+                                let path_to_result = PathBuf::from(&video.filename);
+                                message
+                                    .answer_video(teloxide::types::InputFile::File(path_to_result))
+                                    .send()
+                                    .await
+                                    .log_on_error()
+                                    .await;
+                                println!("succesfully");
+                                println!("more");
+                            }
+                            Err(_) => println!("failure"),
                         }
-                        Err(_) => println!("failure"),
-                    },
 
+                        //let video = Video::new(&respond).await;
+                    }
                     None => {
                         message
                             .answer("Your message is not plain text, I can`t handle it.")
