@@ -93,19 +93,23 @@ pub async fn run() {
         .messages_handler(|rx: DispatcherHandlerRx<Message>| {
             rx.for_each_concurrent(None, |message| async move {
                 match &message.update.text() {
-                    Some(link) => {
-                        let respond = handle_message(link)
-                            .unwrap_or("Sorry, I can`t handle this message".to_owned());
-                        let video = Video::new(&respond).await;
+                    Some(link) => match handle_message(link) {
+                        Ok(respond) => {
+                            let video = Video::new(&respond).await;
 
-                        let path_to_result = PathBuf::from(&video.filename);
-                        message
-                            .answer_video(teloxide::types::InputFile::File(path_to_result))
-                            .send()
-                            .await
-                            .log_on_error()
-                            .await;
-                    }
+                            let path_to_result = PathBuf::from(&video.filename);
+                            message
+                                .answer_video(teloxide::types::InputFile::File(path_to_result))
+                                .send()
+                                .await
+                                .log_on_error()
+                                .await;
+                            println!("succesfully");
+                            println!("more");
+                        }
+                        Err(_) => println!("failure"),
+                    },
+
                     None => {
                         message
                             .answer("Your message is not plain text, I can`t handle it.")
