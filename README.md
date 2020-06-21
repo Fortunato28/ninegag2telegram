@@ -1,6 +1,9 @@
 # ninegag2telegram_bot
 Main functionality: bot gets message contains link to some video and return that video in telegram-readable format
 
+## Requirement
+Your system has to have [ffmpeg](https://www.ffmpeg.org/)
+
 ## Goal
 This is little project for self education. Required way:
 1. Whoyak

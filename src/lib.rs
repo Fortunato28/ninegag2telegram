@@ -3,7 +3,9 @@ use std::error;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use teloxide::prelude::*;
 use url::Url;
 
@@ -18,14 +20,15 @@ impl Video {
         let response = Self::download_resource(link).await;
         let filename = Self::get_filename(&response);
         let body = Self::get_body(response).await;
-        Self::save_to_fs(&filename, &body);
+        let filename = Self::save_to_fs(&filename, &body);
 
         Video { filename, body }
     }
 
-    fn save_to_fs(filename: &str, body: &[u8]) {
+    fn save_to_fs(filename: &str, body: &[u8]) -> String {
         let mut destination = File::create(filename).expect("Problem while create file");
         destination.write_all(body);
+        Self::to_mp4(filename)
     }
 
     async fn get_body(response: reqwest::Response) -> Bytes {
@@ -34,6 +37,26 @@ impl Video {
             .await
             .expect("Problem while getting response body");
         body
+    }
+
+    pub fn to_mp4(filename: &str) -> String {
+        match filename.find(".mp4") {
+            Some(_) => return filename.to_owned(),
+            None => {}
+        }
+
+        let result_filename = filename.replace("webm", "mp4");
+
+        Command::new("ffmpeg")
+            .stdout(Stdio::null())
+            .arg("-i")
+            .arg(filename)
+            .arg(&result_filename)
+            .output()
+            .expect("Failed to execute process");
+
+        fs::remove_file(filename);
+        result_filename
     }
 
     fn get_filename(response: &reqwest::Response) -> String {
