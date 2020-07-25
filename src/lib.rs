@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use bytes::Bytes;
 use std::error;
 use std::fs;
@@ -16,13 +17,13 @@ pub struct Video {
 }
 
 impl Video {
-    pub async fn new(link: &str) -> Video {
+    pub async fn new(link: &str) -> Result<Video> {
         let response = Self::download_resource(link).await;
         let filename = Self::get_filename(&response);
-        let body = Self::get_body(response).await;
+        let body = Self::get_body(response).await?;
         let filename = Self::save_to_fs(&filename, &body);
 
-        Video { filename, body }
+        Ok(Video { filename, body })
     }
 
     fn save_to_fs(filename: &str, body: &[u8]) -> String {
@@ -31,11 +32,11 @@ impl Video {
         Self::to_mp4(filename)
     }
 
-    async fn get_body(response: reqwest::Response) -> Bytes {
+    async fn get_body(response: reqwest::Response) -> Result<Bytes> {
         let body = response
             .bytes()
             .await
-            .expect("Problem while getting response body");
+            .context("Problem while getting response body");
         body
     }
 
@@ -116,20 +117,32 @@ pub async fn run() {
             rx.for_each_concurrent(None, |message| async move {
                 match &message.update.text() {
                     Some(link) => match &handle_message(link) {
-                        Ok(respond) => {
-                            let video = Video::new(&respond).await;
-
-                            let path_to_result = PathBuf::from(&video.filename);
-                            message
-                                .answer_video(teloxide::types::InputFile::File(path_to_result))
+                        Ok(respond) => match Video::new(&respond).await {
+                            Ok(video) => {
+                                let path_to_result = PathBuf::from(&video.filename);
+                                message
+                                    .answer_video(teloxide::types::InputFile::File(path_to_result))
+                                    .send()
+                                    .await
+                                    .log_on_error()
+                                    .await;
+                            }
+                            Err(_) => {
+                                message
+                                .answer(
+                                    "Probably your message is not a valid url, I can't handle it.",
+                                )
                                 .send()
                                 .await
                                 .log_on_error()
                                 .await;
-                        }
+                            }
+                        },
                         Err(_) => {
                             message
-                                .answer("Probably your message is not a valid url, I can't handle it.")
+                                .answer(
+                                    "Probably your message is not a valid url, I can't handle it.",
+                                )
                                 .send()
                                 .await
                                 .log_on_error()
