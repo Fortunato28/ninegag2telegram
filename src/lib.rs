@@ -1,21 +1,24 @@
-use std::error;
+use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 use teloxide::prelude::*;
 use url::Url;
 
 mod video;
 
-fn handle_message(message: &str) -> Result<String, Box<dyn error::Error + Send + Sync + 'static>> {
+fn handle_message(message: &str) -> Result<String> {
     let parsed_link = Url::parse(message)?;
 
     let mut path_segments = parsed_link
         .path_segments()
-        .ok_or_else(|| "cannot be base")?
+        .ok_or_else(|| "Cannot be base")
+        .map_err(|err| anyhow!(err))?
         .skip(1); // Skip "photo"
     let filename = path_segments
         .next()
-        .ok_or_else(|| "Error while getting filename")?;
+        .ok_or_else(|| "Error while getting filename")
+        .map_err(|err| anyhow!(err))?;
 
+    dbg!(&filename);
     // Remove vp9 and av1 from filename if contains
     let result_filename = filename.replace("vp9", "");
     let result_filename = result_filename.replace("av1", "");
