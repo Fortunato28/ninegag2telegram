@@ -41,6 +41,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn handle_correct_message() {
+        let message = "https://img-9gag-fun.9cache.com/photo/aeDQMYq_460svav1.mp4";
+        let handled = handle_message(message).unwrap();
+        assert_eq!(
+            handled,
+            "https://img-9gag-fun.9cache.com/photo/aeDQMYq_460sv.mp4"
+        );
+    }
+
+    #[test]
+    fn handle_not_url_message() {
+        let message = "owowoowo";
+        match handle_message(message) {
+            Ok(_) => panic!(),
+            Err(err) => assert_eq!(
+                err.downcast::<url::ParseError>().unwrap(),
+                url::ParseError::RelativeUrlWithoutBase
+            ),
+        };
+    }
+
+    #[test]
+    fn handle_empty_host_message() {
+        let message = "https://";
+        match handle_message(message) {
+            Ok(_) => panic!(),
+            Err(err) => assert_eq!(
+                err.downcast::<url::ParseError>().unwrap(),
+                url::ParseError::EmptyHost
+            ),
+        };
+    }
+
+    #[test]
     fn filename_form_url() {
         let fullname = Url::parse("https://img-9gag-fun.9cache.com/photo/aeDQMYq_460svav1.mp4")
             .expect("Error while parse url");
