@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use std::fs;
 use std::fs::File;
@@ -45,13 +45,17 @@ impl Video {
 
         let result_filename = filename.replace("webm", "mp4");
 
-        Command::new("ffmpeg")
+        let coding_result = Command::new("ffmpeg")
             .stdout(Stdio::null())
             .arg("-i")
             .arg(filename)
             .arg(&result_filename)
-            .output()
+            .status()
             .context("Failed to execute process")?;
+
+        if !coding_result.success() {
+            return Err(anyhow::Error::msg("Unable to decode webm to mp4"));
+        }
 
         fs::remove_file(filename)?;
         Ok(result_filename)
@@ -126,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn is_mp4_to_fs_saved_properly() -> Result<()> {
+    fn mp4_to_fs_saved_properly() -> Result<()> {
         let filename = "some_file_2.mp4";
         let file_data: [u8; 5] = [0; 5];
         let result_filename = Video::save_to_fs(filename, &file_data)?;
@@ -134,6 +138,38 @@ mod tests {
         assert!(path::Path::new(&result_filename).exists());
 
         std::fs::remove_file(result_filename)?;
+        Ok(())
+    }
+
+    #[test]
+    fn webm_to_fs_conding_fail() -> Result<()> {
+        // That filenames have to be different in each test
+        let filename = "some_file_3.webm";
+        // TODO make good file_data
+        let file_data: [u8; 5] = [0; 5];
+        let result_filename = Video::save_to_fs(filename, &file_data);
+
+        std::fs::remove_file(&filename)?;
+
+        match result_filename {
+            Ok(_) => Err(anyhow!("Here had to be Result with coding error")),
+            Err(err) => {
+                assert_eq!(err.to_string(), "Unable to decode webm to mp4");
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn webm_to_fs_filename() -> Result<()> {
+        // That filenames have to be different in each test
+        let filename = "some_file_4.webm";
+        // TODO make good file_data
+        //let file_data: [u8; 5] = [0; 5];
+        //let result_filename = Video::save_to_fs(filename, &file_data)?;
+
+        //assert_eq!("some_file_2.mp4", result_filename);
+
         Ok(())
     }
 }
