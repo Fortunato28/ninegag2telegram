@@ -16,14 +16,16 @@ impl Video {
         let response = Self::download_resource(link).await;
         let filename = Self::get_filename(&response.url());
         let body = Self::get_body(response).await?;
-        let filename = Self::save_to_fs(&filename, &body);
+        let filename = Self::save_to_fs(&filename, &body)?;
 
         Ok(Video { filename, body })
     }
 
-    fn save_to_fs(filename: &str, body: &[u8]) -> String {
-        let mut destination = File::create(filename).expect("Problem while create file");
-        destination.write_all(body);
+    fn save_to_fs(filename: &str, body: &[u8]) -> Result<String> {
+        let mut destination = File::create(filename).context("Unable to create file")?;
+        destination
+            .write_all(body)
+            .context("Unable write data to the file")?;
         Self::to_mp4(filename)
     }
 
@@ -35,9 +37,9 @@ impl Video {
         body
     }
 
-    pub fn to_mp4(filename: &str) -> String {
+    fn to_mp4(filename: &str) -> Result<String> {
         match filename.find(".mp4") {
-            Some(_) => return filename.to_owned(),
+            Some(_) => return Ok(filename.to_owned()),
             None => {}
         }
 
@@ -49,10 +51,10 @@ impl Video {
             .arg(filename)
             .arg(&result_filename)
             .output()
-            .expect("Failed to execute process");
+            .context("Failed to execute process")?;
 
-        fs::remove_file(filename);
-        result_filename
+        fs::remove_file(filename)?;
+        Ok(result_filename)
     }
 
     fn get_filename(response_url: &reqwest::Url) -> String {
@@ -85,6 +87,7 @@ impl Drop for Video {
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
+    use std::path;
 
     #[test]
     fn correct_filename() -> Result<()> {
@@ -106,6 +109,31 @@ mod tests {
 
         assert_eq!(test_filename, "tmp.bin");
 
+        Ok(())
+    }
+
+    #[test]
+    fn mp4_to_fs_filename() -> Result<()> {
+        // That filenames have to be different in each test
+        let filename = "some_file_1.mp4";
+        let file_data: [u8; 5] = [0; 5];
+        let result_filename = Video::save_to_fs(filename, &file_data)?;
+
+        assert_eq!(filename, result_filename);
+
+        std::fs::remove_file(result_filename)?;
+        Ok(())
+    }
+
+    #[test]
+    fn is_mp4_to_fs_saved_properly() -> Result<()> {
+        let filename = "some_file_2.mp4";
+        let file_data: [u8; 5] = [0; 5];
+        let result_filename = Video::save_to_fs(filename, &file_data)?;
+
+        assert!(path::Path::new(&result_filename).exists());
+
+        std::fs::remove_file(result_filename)?;
         Ok(())
     }
 }
