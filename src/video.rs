@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use bytes::Bytes;
 use std::fs;
 use std::fs::File;
@@ -83,7 +83,8 @@ impl Video {
 impl Drop for Video {
     fn drop(&mut self) {
         dbg!(&self.filename);
-        fs::remove_file(&self.filename);
+        // Just suppressing possible error
+        fs::remove_file(&self.filename).ok();
     }
 }
 
