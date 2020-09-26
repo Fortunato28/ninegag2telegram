@@ -3,7 +3,7 @@ use bytes::Bytes;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 #[derive(Debug)]
 pub struct Video {
@@ -46,14 +46,13 @@ impl Video {
         let result_filename = filename.replace("webm", "mp4");
 
         let coding_result = Command::new("ffmpeg")
-            .stdout(Stdio::null())
             .arg("-i")
             .arg(filename)
             .arg(&result_filename)
-            .status()
+            .output()
             .context("Failed to execute process")?;
 
-        if !coding_result.success() {
+        if !coding_result.status.success() {
             return Err(anyhow::Error::msg("Unable to decode webm to mp4"));
         }
 
@@ -152,7 +151,7 @@ mod tests {
         std::fs::remove_file(&filename)?;
 
         match result_filename {
-            Ok(_) => Err(anyhow!("Here had to be Result with coding error")),
+            Ok(_) => Err(anyhow::anyhow!("Here had to be Result with coding error")),
             Err(err) => {
                 assert_eq!(err.to_string(), "Unable to decode webm to mp4");
                 Ok(())
