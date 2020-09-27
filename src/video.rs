@@ -14,7 +14,7 @@ pub struct Video {
 impl Video {
     pub async fn new(link: &str) -> Result<Video> {
         let response = Self::download_resource(link).await;
-        let filename = Self::get_filename(&response.url());
+        let filename = Self::extract_filename(&response.url())?;
         let body = Self::get_body(response).await?;
         let filename = Self::save_to_fs(&filename, &body)?;
 
@@ -60,13 +60,19 @@ impl Video {
         Ok(result_filename)
     }
 
-    fn get_filename(response_url: &reqwest::Url) -> String {
-        response_url
+    fn extract_filename(response_url: &reqwest::Url) -> Result<String> {
+        Ok(response_url
             .path_segments()
             .and_then(|segments| segments.last())
-            .and_then(|name| if name.is_empty() { None } else { Some(name) })
-            .unwrap_or("tmp.bin")
-            .to_owned()
+            .and_then(|name| {
+                if name.contains("webm") || name.contains("mp4") {
+                    Some(name)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Filename is not webm or mp4"))?
+            .to_owned())
     }
 
     async fn download_resource(link: &str) -> reqwest::Response {
@@ -98,7 +104,7 @@ mod tests {
         // Make test url
         let url =
             reqwest::Url::parse("https://img-9gag-fun.9cache.com/photo/a2WL8RE_460svav1.mp4")?;
-        let test_filename = Video::get_filename(&url);
+        let test_filename = Video::extract_filename(&url)?;
 
         assert_eq!(test_filename, "a2WL8RE_460svav1.mp4");
 
@@ -106,14 +112,20 @@ mod tests {
     }
 
     #[test]
-    fn empty_filename() -> Result<()> {
+    fn not_video_filename() -> Result<()> {
         // Make test url
-        let url = reqwest::Url::parse("https://img-9gag-fun.9cache.com/photo/")?;
-        let test_filename = Video::get_filename(&url);
+        let url = reqwest::Url::parse("https://img-9gag-fun.9cache.com/photo/some_file.jpg")?;
+        let error = Video::extract_filename(&url);
 
-        assert_eq!(test_filename, "tmp.bin");
-
-        Ok(())
+        match error {
+            Ok(_) => Err(anyhow::anyhow!(
+                "Here had to be Result with wrong filename error"
+            )),
+            Err(err) => {
+                assert_eq!(err.to_string(), "Filename is not webm or mp4");
+                Ok(())
+            }
+        }
     }
 
     #[test]
