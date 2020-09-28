@@ -5,6 +5,8 @@ use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 
+use crate::handle_message;
+
 #[derive(Debug)]
 pub struct Video {
     pub filename: String,
@@ -13,7 +15,8 @@ pub struct Video {
 
 impl Video {
     pub async fn new(link: &str) -> Result<Video> {
-        let response = Self::download_resource(link).await;
+        let handled_link = handle_message::handle_message(link)?;
+        let response = Self::download_resource(&handled_link).await;
         let filename = Self::extract_filename(&response.url())?;
         let body = Self::get_body(response).await?;
         let filename = Self::save_to_fs(&filename, &body)?;

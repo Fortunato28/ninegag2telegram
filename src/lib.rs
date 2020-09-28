@@ -14,28 +14,16 @@ pub async fn run() {
         .messages_handler(|rx: DispatcherHandlerRx<Message>| {
             rx.for_each_concurrent(None, |message| async move {
                 match &message.update.text() {
-                    Some(link) => match &handle_message::handle_message(link) {
-                        Ok(respond) => match video::Video::new(&respond).await {
-                            Ok(video) => {
-                                let path_to_result = PathBuf::from(&video.filename);
-                                message
-                                    .answer_video(teloxide::types::InputFile::File(path_to_result))
-                                    .send()
-                                    .await
-                                    .log_on_error()
-                                    .await;
-                            }
-                            Err(_) => {
-                                message
-                                .answer(
-                                    "Probably your message is not a valid url, I can't handle it.",
-                                )
+                    Some(link) => match video::Video::new(&link).await {
+                        Ok(video) => {
+                            let path_to_result = PathBuf::from(&video.filename);
+                            message
+                                .answer_video(teloxide::types::InputFile::File(path_to_result))
                                 .send()
                                 .await
                                 .log_on_error()
                                 .await;
-                            }
-                        },
+                        }
                         Err(_) => {
                             message
                                 .answer(
