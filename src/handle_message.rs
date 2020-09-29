@@ -20,7 +20,7 @@ fn extract_filename(parsed_link: &Url) -> Result<&str> {
 
     let filename = path_segments
         .next()
-        .ok_or_else(|| "Error while getting filename")
+        .ok_or_else(|| "Error while getting filename for constructing result link to video")
         .map_err(|err| anyhow!(err))?;
 
     Ok(filename)
@@ -88,7 +88,10 @@ mod tests {
             Url::parse("https://img-9gag-fun.9cache.com/").expect("Error while parse url");
         match extract_filename(&fullname) {
             Ok(_) => panic!(),
-            Err(err) => assert_eq!(err.to_string(), "Error while getting filename"),
+            Err(err) => assert_eq!(
+                err.to_string(),
+                "Error while getting filename for constructing result link to video"
+            ),
         };
     }
 

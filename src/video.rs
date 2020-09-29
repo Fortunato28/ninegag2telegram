@@ -71,6 +71,7 @@ impl Video {
                 if name.contains("webm") || name.contains("mp4") {
                     Some(name)
                 } else {
+                    dbg!(&name);
                     None
                 }
             })
