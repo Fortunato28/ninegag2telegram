@@ -27,7 +27,7 @@ pub async fn run() {
                         Err(err) => {
                             message
                                 .answer(
-                                    "Probably your message is not a valid url to 9gag video, I can't handle it: ".to_owned() + &err.to_string(),
+                                    "Probably your message is not a valid url to 9gag video, I can't handle it:\n".to_owned() + &err.to_string(),
                                 )
                                 .send()
                                 .await

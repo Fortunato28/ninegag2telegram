@@ -1,29 +1,30 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use url::Url;
 
 pub fn handle_message(message: &str) -> Result<String> {
     let parsed_link = Url::parse(message)?;
     let filename = extract_filename(&parsed_link)?;
+    dbg!(&filename);
 
-    let result_filename = transform_ninegag_name(filename);
+    let result_filename = transform_ninegag_name(&filename);
 
     let result_link = parsed_link.join(&result_filename)?;
     Ok(result_link.into_string())
 }
 
-fn extract_filename(parsed_link: &Url) -> Result<&str> {
-    let mut path_segments = parsed_link
+fn extract_filename(parsed_link: &Url) -> Result<String> {
+    Ok(parsed_link
         .path_segments()
-        .ok_or_else(|| "Cannot be base")
-        .map_err(|err| anyhow!(err))?
-        .skip(1); // Skip "photo/"
-
-    let filename = path_segments
-        .next()
-        .ok_or_else(|| "Error while getting filename for constructing result link to video")
-        .map_err(|err| anyhow!(err))?;
-
-    Ok(filename)
+        .and_then(|segments| segments.last())
+        .and_then(|name| {
+            if name.contains("webm") || name.contains("mp4") {
+                Some(name)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow::anyhow!("Filename is not webm or mp4"))?
+        .to_owned())
 }
 
 fn transform_ninegag_name(filename: &str) -> String {
@@ -83,16 +84,15 @@ mod tests {
     }
 
     #[test]
-    fn filename_error() {
-        let fullname =
-            Url::parse("https://img-9gag-fun.9cache.com/").expect("Error while parse url");
+    fn filename_error() -> Result<()> {
+        let fullname = Url::parse("https://img-9gag-fun.9cache.com/")?;
         match extract_filename(&fullname) {
-            Ok(_) => panic!(),
-            Err(err) => assert_eq!(
-                err.to_string(),
-                "Error while getting filename for constructing result link to video"
-            ),
-        };
+            Ok(_) => Err(anyhow::anyhow!("Here had to be filename error")),
+            Err(err) => {
+                assert_eq!(err.to_string(), "Filename is not webm or mp4");
+                Ok(())
+            }
+        }
     }
 
     #[test]
@@ -114,5 +114,22 @@ mod tests {
         let good_name = "arVmMEy_460sv.mp4";
         let result_name = transform_ninegag_name(good_name);
         assert_eq!(result_name, good_name);
+    }
+
+    #[test]
+    fn not_video_filename() -> Result<()> {
+        // Make test url
+        let url = reqwest::Url::parse("https://img-9gag-fun.9cache.com/photo/some_file.jpg")?;
+        let error = extract_filename(&url);
+
+        match error {
+            Ok(_) => Err(anyhow::anyhow!(
+                "Here had to be Result with wrong filename error"
+            )),
+            Err(err) => {
+                assert_eq!(err.to_string(), "Filename is not webm or mp4");
+                Ok(())
+            }
+        }
     }
 }

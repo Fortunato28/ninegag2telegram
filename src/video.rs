@@ -84,7 +84,6 @@ impl Video {
 
 impl Drop for Video {
     fn drop(&mut self) {
-        dbg!(&self.filename);
         // Just suppressing possible error
         fs::remove_file(&self.filename).ok();
     }
@@ -104,17 +103,6 @@ mod tests {
         let test_filename = Video::get_filename(&url);
 
         assert_eq!(test_filename, "a2WL8RE_460svav1.mp4");
-
-        Ok(())
-    }
-
-    #[test]
-    fn empty_filename() -> Result<()> {
-        // Make test url
-        let url = reqwest::Url::parse("https://img-9gag-fun.9cache.com/photo/")?;
-        let test_filename = Video::get_filename(&url);
-
-        assert_eq!(test_filename, "tmp.bin");
 
         Ok(())
     }
