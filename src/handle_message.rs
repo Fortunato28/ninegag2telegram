@@ -4,7 +4,6 @@ use url::Url;
 pub fn handle_message(message: &str) -> Result<String> {
     let parsed_link = Url::parse(message)?;
     let filename = extract_filename(&parsed_link)?;
-    dbg!(&filename);
 
     let result_filename = transform_ninegag_name(&filename);
 
