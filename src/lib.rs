@@ -14,7 +14,11 @@ pub async fn run() {
         .messages_handler(|rx: DispatcherHandlerRx<Message>| {
             rx.for_each_concurrent(None, |message| async move {
                 match &message.update.text() {
-                    Some(link) => match video::Video::new(&link).await {
+                    Some(link) => {
+                        // TODO delete fucking unwrap
+                        let wait_message = message.answer("OK I got it, wait a little").send().await.unwrap();
+
+                        match video::Video::new(&link).await {
                         Ok(video) => {
                             let path_to_result = PathBuf::from(&video.filename);
                             message
@@ -34,6 +38,10 @@ pub async fn run() {
                                 .log_on_error()
                                 .await;
                         }
+                    }
+
+                        // Delete message "wait pls"
+                        message.delete_message().message_id(wait_message.id).send().await.log_on_error().await;
                     },
                     None => {
                         message

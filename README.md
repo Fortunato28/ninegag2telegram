@@ -18,5 +18,5 @@ This is little project for self education. Required way:
 - [x] Send video to the dialog
 - [x] Clean
 - [x] Error handling
-- [ ] Send message like "I'm working wait pls", and then edit it to video respond
+- [x] Send message like "I'm working wait pls", and then edit it to video respond
 - [x] Delete garbage files when user message is not a video link
