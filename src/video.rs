@@ -44,10 +44,8 @@ impl Video {
     }
 
     fn to_mp4(unhandled_video: Video) -> Result<Video> {
-        // TODO maybe rewrite it to and_then or smth like this
-        match unhandled_video.filename.find(".mp4") {
-            Some(_) => return Ok(unhandled_video),
-            None => {}
+        if let Some(_) = unhandled_video.filename.find(".mp4") {
+            return Ok(unhandled_video);
         }
 
         let result_filename = unhandled_video.filename.replace("webm", "mp4");
