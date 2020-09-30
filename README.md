@@ -17,6 +17,6 @@ This is little project for self education. Required way:
 - [x] Pars url
 - [x] Send video to the dialog
 - [x] Clean
-- [ ] Error handling
+- [x] Error handling
 - [ ] Send message like "I'm working wait pls", and then edit it to video respond
-- [ ] Delete garbage files when user message is not a video link
+- [x] Delete garbage files when user message is not a video link

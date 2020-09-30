@@ -10,7 +10,6 @@ use crate::handle_message;
 #[derive(Debug)]
 pub struct Video {
     pub filename: String,
-    body: Bytes,
 }
 
 impl Video {
@@ -19,17 +18,21 @@ impl Video {
         let response = Self::download_resource(&handled_link).await;
         let filename = Self::get_filename(&response.url());
         let body = Self::get_body(response).await?;
-        let filename = Self::save_to_fs(&filename, &body)?;
+        let video = Self::save_to_fs(&filename, &body)?;
 
-        Ok(Video { filename, body })
+        Ok(video)
     }
 
-    fn save_to_fs(filename: &str, body: &[u8]) -> Result<String> {
-        let mut destination = File::create(filename).context("Unable to create file")?;
+    fn save_to_fs(filename: &str, body: &[u8]) -> Result<Video> {
+        let unhandled_video = Video {
+            filename: filename.to_owned(),
+        };
+        let mut destination =
+            File::create(&unhandled_video.filename).context("Unable to create file")?;
         destination
             .write_all(body)
             .context("Unable write data to the file")?;
-        Self::to_mp4(filename)
+        Self::to_mp4(unhandled_video)
     }
 
     async fn get_body(response: reqwest::Response) -> Result<Bytes> {
@@ -40,17 +43,18 @@ impl Video {
         body
     }
 
-    fn to_mp4(filename: &str) -> Result<String> {
-        match filename.find(".mp4") {
-            Some(_) => return Ok(filename.to_owned()),
+    fn to_mp4(unhandled_video: Video) -> Result<Video> {
+        // TODO maybe rewrite it to and_then or smth like this
+        match unhandled_video.filename.find(".mp4") {
+            Some(_) => return Ok(unhandled_video),
             None => {}
         }
 
-        let result_filename = filename.replace("webm", "mp4");
+        let result_filename = unhandled_video.filename.replace("webm", "mp4");
 
         let coding_result = Command::new("ffmpeg")
             .arg("-i")
-            .arg(filename)
+            .arg(&unhandled_video.filename)
             .arg(&result_filename)
             .output()
             .context("Failed to execute process")?;
@@ -59,8 +63,9 @@ impl Video {
             return Err(anyhow::Error::msg("Unable to decode webm to mp4"));
         }
 
-        fs::remove_file(filename)?;
-        Ok(result_filename)
+        Ok(Video {
+            filename: result_filename,
+        })
     }
 
     fn get_filename(response_url: &reqwest::Url) -> String {
@@ -112,11 +117,10 @@ mod tests {
         // That filenames have to be different in each test
         let filename = "some_file_1.mp4";
         let file_data: [u8; 5] = [0; 5];
-        let result_filename = Video::save_to_fs(filename, &file_data)?;
+        let video = Video::save_to_fs(filename, &file_data)?;
 
-        assert_eq!(filename, result_filename);
+        assert_eq!(filename, video.filename);
 
-        std::fs::remove_file(result_filename)?;
         Ok(())
     }
 
@@ -124,11 +128,10 @@ mod tests {
     fn mp4_to_fs_saved_properly() -> Result<()> {
         let filename = "some_file_2.mp4";
         let file_data: [u8; 5] = [0; 5];
-        let result_filename = Video::save_to_fs(filename, &file_data)?;
+        let video = Video::save_to_fs(filename, &file_data)?;
 
-        assert!(path::Path::new(&result_filename).exists());
+        assert!(path::Path::new(&video.filename).exists());
 
-        std::fs::remove_file(result_filename)?;
         Ok(())
     }
 
@@ -137,11 +140,9 @@ mod tests {
         // That filenames have to be different in each test
         let filename = "some_file_3.webm";
         let file_data: [u8; 5] = [0; 5];
-        let result_filename = Video::save_to_fs(filename, &file_data);
+        let video_error = Video::save_to_fs(filename, &file_data);
 
-        std::fs::remove_file(&filename)?;
-
-        match result_filename {
+        match video_error {
             Ok(_) => Err(anyhow::anyhow!("Here had to be Result with coding error")),
             Err(err) => {
                 assert_eq!(err.to_string(), "Unable to decode webm to mp4");
@@ -156,12 +157,28 @@ mod tests {
         let filename = "some_file_4.webm";
         // Bytes below is just some dummy webm data allowing perform coding to mp4
         let valid_webm = hex::decode("1A45DFA3010000000000001F4286810142F7810142F2810442F381084282847765626D4287810242858102185380670100000000003DCF114D9B74403B4DBB8B53AB841549A96653AC81E54DBB8C53AB841654AE6B53AC8201234DBB8C53AB841254C36753AC8201774DBB8C53AB841C53BB6B53AC823DB2EC010000000000009B00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001549A96601000000000000322AD7B1830F42404D808D4C61766635382E32302E31303057418D4C61766635382E32302E31303044898840590000000000001654AE6B0100000000000048AE010000000000003FD7810173C581019C810022B59C83756E648685565F56503983810123E3838401FCA055E00100000000000013B0820196BA8202D055B08855B7810155B881021254C367010000000000015B7373010000000000009E63C0010000000000000067C8010000000000001545A38B4D414A4F525F4252414E4444878469736F6D67C8010000000000001645A38D4D494E4F525F56455253494F4E44878335313267C8010000000000002745A391434F4D50415449424C455F4252414E445344879069736F6D69736F32617663316D70343167C8010000000000001A45A387454E434F44455244878D4C61766635382E32302E3130307373010000000000006563C0010000000000000463C5810167C8010000000000001E45A38C48414E444C45525F4E414D4544878C566964656F48616E646C657267C8010000000000002545A387454E434F4445524487984C61766335382E33352E313030206C69627670782D7670397373010000000000003A63C0010000000000000463C5810167C8010000000000002245A3884455524154494F4E44879430303A30303A30302E31303030303030303000001F43B6750100000000003AC8E78100A378CF81000080824983420019502CF61238241C18EE0006B07FC9F9")?;
-        let result_filename = Video::save_to_fs(filename, &valid_webm)?;
+        let video = Video::save_to_fs(filename, &valid_webm)?;
 
-        assert_eq!("some_file_4.mp4", result_filename);
+        assert_eq!("some_file_4.mp4", video.filename);
 
-        std::fs::remove_file(&result_filename)?;
+        Ok(())
+    }
 
+    #[test]
+    fn no_garbage_on_fs() -> Result<()> {
+        // That filenames have to be different in each test
+        let filename = "had_to_be_deleted.webm";
+        let file_data: [u8; 5] = [0; 5];
+        let video_error = Video::save_to_fs(filename, &file_data);
+
+        match video_error {
+            Ok(_) => return Err(anyhow::anyhow!("Here had to be Result with coding error")),
+            Err(err) => {
+                assert_eq!(err.to_string(), "Unable to decode webm to mp4");
+            }
+        };
+
+        assert!(!path::Path::new(&filename).exists());
         Ok(())
     }
 }
